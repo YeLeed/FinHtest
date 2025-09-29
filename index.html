@@ -1,56 +1,166 @@
-
 <!doctype html>
 <html>
   <head>
     <title>Fin ZD demo</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.tailwindcss.com"></script>
 
     <script>
-      function reset() {
-        const cookies = document.cookie.split(";");
+      (function () {
+        'use strict';
 
-        for (let i = 0; i < cookies.length; i++) {
-
-            const cookie = cookies[i];
-
-            const eqPos = cookie.indexOf("=");
-
-            const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-
-            // Set the cookie's expiration date to a past date to delete it
-
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-
+        // ---- Utilities to remove Intercom data (cookies + storage) ----
+        function getDomainVariants(hostname) {
+          // Return likely cookie domain variants, e.g. ".example.com", ".sub.example.com", and the exact hostname
+          if (!hostname) return [];
+          const parts = hostname.split('.').filter(Boolean);
+          const variants = [];
+          if (parts.length >= 2) {
+            for (let i = 0; i <= parts.length - 2; i++) {
+              variants.push('.' + parts.slice(i).join('.'));
+            }
+          }
+          variants.push(hostname); // exact host as fallback
+          return Array.from(new Set(variants));
         }
 
-        window.localStorage.clear();
-        window.sessionStorage.clear();
-        window.location.reload();
+        function deleteCookieEverywhere(name) {
+          const expiry = 'Thu, 01 Jan 1970 00:00:00 GMT';
+          // default no-domain delete
+          document.cookie = name + '=; expires=' + expiry + '; Max-Age=0; path=/';
 
-      }
+          // try all domain variants
+          const domains = getDomainVariants(location.hostname);
+          for (const domain of domains) {
+            document.cookie =
+              name +
+              '=; expires=' +
+              expiry +
+              '; Max-Age=0; path=/; domain=' +
+              domain;
+          }
+        }
+
+        function wipeIntercomCookies() {
+          const all = document.cookie ? document.cookie.split(';') : [];
+          const names = all
+            .map((c) => c.split('=')[0].trim())
+            .filter((n) => n && n.toLowerCase().startsWith('intercom-'));
+
+          for (const name of names) deleteCookieEverywhere(name);
+        }
+
+        function wipeIntercomStorage() {
+          try {
+            for (const k of Object.keys(localStorage)) {
+              if (k.toLowerCase().includes('intercom')) localStorage.removeItem(k);
+            }
+          } catch (_) {}
+          try {
+            for (const k of Object.keys(sessionStorage)) {
+              if (k.toLowerCase().includes('intercom')) sessionStorage.removeItem(k);
+            }
+          } catch (_) {}
+        }
+
+        // Expose a global reset function for the button
+        window.resetIntercom = function resetIntercom() {
+          try {
+            if (typeof window.Intercom === 'function') {
+              // Official way to end an Intercom session + clear its cookie
+              window.Intercom('shutdown'); // per Intercom docs
+            }
+          } catch (_) {}
+          wipeIntercomCookies();
+          wipeIntercomStorage();
+          // Ensure the next load is a truly new visitor/session
+          window.location.reload();
+        };
+
+        // ---- Always start clean on each page load *before* the widget boots ----
+        wipeIntercomCookies();
+        wipeIntercomStorage();
+      })();
+    </script>
+
+    <script>
+      // Intercom settings (EU data region)
+      // Keep APP_ID consistent everywhere
+      var APP_ID = "d5upemlt";
+
+      window.intercomSettings = {
+        app_id: APP_ID,
+        api_base: "https://api-iam.eu.intercom.io"
+      };
     </script>
   </head>
-  <body class="p-6 flex flex-col flex-1 items-center justify-center min-h-screen bg-cover" style="background-image: url('https://downloads.intercomcdn.com/i/o/1051523575/8c16c6bb97ae791131ead20c/blur.jpg')">
+
+  <body
+    class="p-6 flex flex-col flex-1 items-center justify-center min-h-screen bg-cover"
+    style="background-image: url('https://downloads.intercomcdn.com/i/o/1051523575/8c16c6bb97ae791131ead20c/blur.jpg')"
+  >
     <div class="flex flex-col space-y-2 items-center">
       <div>
-        <img src="https://static.intercomassets.com/assets/default-avatars/fin/128-6a5eabbb84cc2b038b2afc6698ca0a974faf7adc9ea9f0fb3c3e78ac12543bc5.png" height="50" width="50"  >
+        <img
+          src="https://static.intercomassets.com/assets/default-avatars/fin/128-6a5eabbb84cc2b038b2afc6698ca0a974faf7adc9ea9f0fb3c3e78ac12543bc5.png"
+          height="50"
+          width="50"
+          alt="Fin avatar"
+        />
       </div>
-      <button class="bg-black text-white p-2 m-2 rounded hover:bg-opacity-75" onclick="reset()">Reset</button>
+
+      <!-- The Reset button now truly resets the Messenger session -->
+      <button
+        class="bg-black text-white p-2 m-2 rounded hover:bg-opacity-75"
+        onclick="resetIntercom()"
+      >
+        Reset
+      </button>
     </div>
+
+    <!-- Standard Intercom embed; keep APP_ID in the URL in sync with intercomSettings -->
     <script>
-      window.intercomSettings = {
-        api_base: "https://api-iam.eu.intercom.io",
-        app_id: "d5upemlt",
-      }
+      (function () {
+        var w = window;
+        var ic = w.Intercom;
+        if (typeof ic === "function") {
+          ic("reattach_activator");
+          ic("update", w.intercomSettings);
+        } else {
+          var d = document;
+          var i = function () {
+            i.c(arguments);
+          };
+          i.q = [];
+          i.c = function (args) {
+            i.q.push(args);
+          };
+          w.Intercom = i;
+          function l() {
+            var s = d.createElement("script");
+            s.type = "text/javascript";
+            s.async = true;
+            // IMPORTANT: this must use your APP_ID
+            s.src = "https://widget.intercom.io/widget/" + w.intercomSettings.app_id;
+            var x = d.getElementsByTagName("script")[0];
+            x.parentNode.insertBefore(s, x);
+          }
+          if (document.readyState === "complete") {
+            l();
+          } else if (w.attachEvent) {
+            w.attachEvent("onload", l);
+          } else {
+            w.addEventListener("load", l, false);
+          }
+        }
+      })();
     </script>
-    
-    
-    <script>
-      // We pre-filled your app ID in the widget URL: 'https://widget.intercom.io/widget/mw2u5h8i'
-      (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/mw2u5h8i';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
-    </script>
-    <script id="ze-snippet" src="https://static.zdassets.com/ekr/snippet.js?key=8e34671c-b79f-4163-8738-806e88691ceff1"> </script>
+
+    <!-- (Optional) Zendesk snippet left as-is -->
+    <script
+      id="ze-snippet"
+      src="https://static.zdassets.com/ekr/snippet.js?key=8e34671c-b79f-4163-8738-806e88691ceff1"
+    ></script>
   </body>
 </html>
