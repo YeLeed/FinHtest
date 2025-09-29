@@ -12,6 +12,7 @@
 
         // ---- Utilities to remove Intercom data (cookies + storage) ----
         function getDomainVariants(hostname) {
+          // Return likely cookie domain variants, e.g. ".example.com", ".sub.example.com", and the exact hostname
           if (!hostname) return [];
           const parts = hostname.split('.').filter(Boolean);
           const variants = [];
@@ -20,13 +21,16 @@
               variants.push('.' + parts.slice(i).join('.'));
             }
           }
-          variants.push(hostname);
+          variants.push(hostname); // exact host as fallback
           return Array.from(new Set(variants));
         }
 
         function deleteCookieEverywhere(name) {
           const expiry = 'Thu, 01 Jan 1970 00:00:00 GMT';
+          // default no-domain delete
           document.cookie = name + '=; expires=' + expiry + '; Max-Age=0; path=/';
+
+          // try all domain variants
           const domains = getDomainVariants(location.hostname);
           for (const domain of domains) {
             document.cookie =
@@ -60,18 +64,17 @@
           } catch (_) {}
         }
 
-        // Expose for other functions on the page
-        window.__icWipe = { wipeIntercomCookies, wipeIntercomStorage };
-
-        // Global Reset button action (full reset + reload)
+        // Expose a global reset function for the button
         window.resetIntercom = function resetIntercom() {
           try {
             if (typeof window.Intercom === 'function') {
-              window.Intercom('shutdown');
+              // Official way to end an Intercom session + clear its cookie
+              window.Intercom('shutdown'); // per Intercom docs
             }
           } catch (_) {}
           wipeIntercomCookies();
           wipeIntercomStorage();
+          // Ensure the next load is a truly new visitor/session
           window.location.reload();
         };
 
@@ -82,10 +85,10 @@
     </script>
 
     <script>
+      // Intercom settings (EU data region)
       // Keep APP_ID consistent everywhere
       var APP_ID = "d5upemlt";
 
-      // You can boot anonymously on load using this minimal config
       window.intercomSettings = {
         app_id: APP_ID,
         api_base: "https://api-iam.eu.intercom.io"
@@ -94,90 +97,29 @@
   </head>
 
   <body
-    class="p-6 flex flex-col items-center justify-center min-h-screen bg-cover"
+    class="p-6 flex flex-col flex-1 items-center justify-center min-h-screen bg-cover"
     style="background-image: url('https://downloads.intercomcdn.com/i/o/1051523575/8c16c6bb97ae791131ead20c/blur.jpg')"
   >
-    <div class="w-full max-w-xl mx-auto space-y-6">
-      <!-- Header / Avatar -->
-      <div class="flex flex-col items-center space-y-2">
+    <div class="flex flex-col space-y-2 items-center">
+      <div>
         <img
           src="https://static.intercomassets.com/assets/default-avatars/fin/128-6a5eabbb84cc2b038b2afc6698ca0a974faf7adc9ea9f0fb3c3e78ac12543bc5.png"
           height="50"
           width="50"
           alt="Fin avatar"
         />
-        <div class="flex items-center space-x-2">
-          <button
-            class="bg-black text-white px-3 py-2 rounded hover:bg-opacity-80"
-            onclick="resetIntercom()"
-            title="Shutdown Intercom, clear cookies/storage, and reload"
-          >
-            Reset
-          </button>
-        </div>
       </div>
 
-      <!-- Tester panel -->
-      <div class="bg-white/80 backdrop-blur rounded-lg shadow p-4">
-        <h2 class="text-lg font-semibold mb-3">Test as user</h2>
-        <p class="text-sm text-gray-700 mb-3">
-          Enter <strong>email</strong> and/or <strong>user_id</strong> (optionally name &amp; custom attributes) and click <em>Boot as user</em>.
-          This will end the current session and start a fresh one as that identity.
-        </p>
-
-        <div class="grid grid-cols-1 gap-3">
-          <label class="block">
-            <span class="text-sm font-medium text-gray-800">Email</span>
-            <input id="ic_email" type="email" placeholder="jane@example.com"
-                   class="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring" />
-          </label>
-
-          <label class="block">
-            <span class="text-sm font-medium text-gray-800">User ID</span>
-            <input id="ic_user_id" type="text" placeholder="internal-uid-123"
-                   class="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring" />
-          </label>
-
-          <label class="block">
-            <span class="text-sm font-medium text-gray-800">Name (optional)</span>
-            <input id="ic_name" type="text" placeholder="Jane Doe"
-                   class="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring" />
-          </label>
-
-          <label class="block">
-            <span class="text-sm font-medium text-gray-800">Custom attributes (JSON, optional)</span>
-            <textarea id="ic_custom" rows="4" placeholder='{"plan":"pro","signup_at": 1696012345}'
-                      class="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring"></textarea>
-          </label>
-
-          <div class="flex items-center gap-2">
-            <button
-              class="bg-black text-white px-3 py-2 rounded hover:bg-opacity-80"
-              type="button"
-              onclick="bootAsUser()"
-              title="Shutdown + Boot Intercom with provided identity"
-            >
-              Boot as user
-            </button>
-
-            <button
-              class="bg-gray-900 text-white px-3 py-2 rounded hover:bg-opacity-80"
-              type="button"
-              onclick="bootAnonymous()"
-              title="Shutdown + Boot Intercom as a fresh anonymous visitor"
-            >
-              Boot anonymous
-            </button>
-          </div>
-
-          <p class="text-xs text-gray-600 mt-1">
-            Tip: Provide at least one of <code>email</code> or <code>user_id</code>. Both is fine, too.
-          </p>
-        </div>
-      </div>
+      <!-- The Reset button now truly resets the Messenger session -->
+      <button
+        class="bg-black text-white p-2 m-2 rounded hover:bg-opacity-75"
+        onclick="resetIntercom()"
+      >
+        Reset
+      </button>
     </div>
 
-    <!-- Intercom loader (kept aligned with APP_ID) -->
+    <!-- Standard Intercom embed; keep APP_ID in the URL in sync with intercomSettings -->
     <script>
       (function () {
         var w = window;
@@ -187,15 +129,20 @@
           ic("update", w.intercomSettings);
         } else {
           var d = document;
-          var i = function () { i.c(arguments); };
+          var i = function () {
+            i.c(arguments);
+          };
           i.q = [];
-          i.c = function (args) { i.q.push(args); };
+          i.c = function (args) {
+            i.q.push(args);
+          };
           w.Intercom = i;
           function l() {
             var s = d.createElement("script");
             s.type = "text/javascript";
             s.async = true;
-            s.src = "https://widget.intercom.io/widget/" + (w.intercomSettings && w.intercomSettings.app_id ? w.intercomSettings.app_id : "d5upemlt");
+            // IMPORTANT: this must use your APP_ID
+            s.src = "https://widget.intercom.io/widget/" + w.intercomSettings.app_id;
             var x = d.getElementsByTagName("script")[0];
             x.parentNode.insertBefore(s, x);
           }
@@ -208,65 +155,6 @@
           }
         }
       })();
-
-      // ---- Boot helpers for the tester panel ----
-      function parseCustomJSON(raw) {
-        if (!raw || !raw.trim()) return undefined;
-        try {
-          return JSON.parse(raw);
-        } catch (e) {
-          alert("Custom attributes must be valid JSON.\n\n" + e.message);
-          throw e;
-        }
-      }
-
-      function buildSettingsFromInputs() {
-        var email = document.getElementById('ic_email').value.trim();
-        var user_id = document.getElementById('ic_user_id').value.trim();
-        var name = document.getElementById('ic_name').value.trim();
-        var custom = parseCustomJSON(document.getElementById('ic_custom').value);
-
-        var settings = {
-          app_id: APP_ID,
-          api_base: "https://api-iam.eu.intercom.io"
-        };
-        if (email) settings.email = email;
-        if (user_id) settings.user_id = user_id;
-        if (name) settings.name = name;
-        if (custom) settings.custom_attributes = custom;
-
-        return settings;
-      }
-
-      function hardRebootIntercom(nextSettings) {
-        try { if (typeof Intercom === "function") Intercom("shutdown"); } catch (_) {}
-        // Clear any residual Intercom client data before the new identity
-        window.__icWipe.wipeIntercomCookies();
-        window.__icWipe.wipeIntercomStorage();
-
-        // Boot with the requested identity
-        window.intercomSettings = nextSettings;
-        Intercom("boot", nextSettings);
-        // Optionally show the Messenger immediately:
-        // Intercom("show");
-      }
-
-      function bootAsUser() {
-        var s = buildSettingsFromInputs();
-        if (!s.email && !s.user_id) {
-          alert("Please provide at least an email or a user_id.");
-          return;
-        }
-        hardRebootIntercom(s);
-      }
-
-      function bootAnonymous() {
-        var s = {
-          app_id: APP_ID,
-          api_base: "https://api-iam.eu.intercom.io"
-        };
-        hardRebootIntercom(s);
-      }
     </script>
 
     <!-- (Optional) Zendesk snippet left as-is -->
